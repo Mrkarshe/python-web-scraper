@@ -5,71 +5,65 @@ from urllib.parse import urljoin
 import pandas as pd
 import datetime
 
-st.set_page_config(page_title="Product & Price Scraper", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Universal Web Scraper", page_icon="📊", layout="wide")
 
-st.title("📊 Commercial Web Scraper & Price Tracker")
-st.write("Extract structured product names, prices, and links into a clean spreadsheet for clients.")
+st.title("📊 Universal Commercial Web Scraper")
+st.write("Paste any public website URL below to extract items, text, and links instantly.")
 
-# Default example: A public catalog or directory page
-user_url = st.text_input("Enter Website URL:", "https://books.toscrape.com/")
+user_url = st.text_input("Enter Website URL:", "https://webscraper.io/test-sites/e-commerce/allinone")
 
-if st.button("Extract Commercial Data"):
+if st.button("Extract Data"):
     if not user_url:
         st.warning("Please enter a URL!")
     else:
-        with st.spinner("Scraping marketplace data..."):
+        with st.spinner("Scraping live website data..."):
             try:
-                headers = {'User-Agent': 'Mozilla/5.0'}
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
                 response = requests.get(user_url, headers=headers, timeout=10)
                 
                 if response.status_code == 200:
                     soup = BeautifulSoup(response.text, 'html.parser')
                     
-                    # Target common product/item card structures
-                    items = soup.find_all(['article', 'div'], class_=['product_pod', 'card', 'item'])
-                    if not items:
-                        # Fallback if specific classes aren't found
-                        items = soup.find_all(['h3', 'h2'])
-                        
+                    # Universal extraction: look for product cards, headings, or links with text
+                    elements = soup.find_all(['a', 'h1', 'h2', 'h3', 'span', 'div'])
+                    
                     data = []
                     scan_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    seen_texts = set()
                     
-                    for item in items[:25]:
-                        # Try to extract title/name
-                        title_el = item.find(['a', 'h3', 'h2', 'span'])
-                        title = title_el.get_text().strip() if title_el else "N/A"
-                        
-                        # Try to extract price if available
-                        price_el = item.find(class_=['price', 'cost', 'amount'])
-                        price = price_el.get_text().strip() if price_el else "Check Link"
-                        
-                        # Extract link
-                        link_el = item.find('a')
-                        raw_link = link_el.get('href') if link_el and link_el.has_attr('href') else 'N/A'
-                        link = urljoin(user_url, raw_link) if raw_link != 'N/A' else 'N/A'
-                        
-                        if title and title != "N/A":
+                    for el in elements:
+                        text = el.get_text().strip()
+                        # Filter for clean, readable text items (avoiding tiny snippets)
+                        if text and len(text) > 4 and text not in seen_texts:
+                            # Try to find an associated link
+                            link_el = el.find('a') if el.name != 'a' else el
+                            raw_link = link_el.get('href') if link_el and link_el.has_attr('href') else 'N/A'
+                            link = urljoin(user_url, raw_link) if raw_link != 'N/A' else 'N/A'
+                            
+                            seen_texts.add(text)
                             data.append({
-                                "Item Name / Title": title,
-                                "Price / Detail": price,
-                                "Product Link": link,
-                                "Extracted At": scan_time
+                                "Extracted Text / Title": text,
+                                "Associated Link": link,
+                                "Scraped At": scan_time
                             })
                             
+                            if len(data) >= 30: # Limit to top 30 clean records
+                                break
+                                
                     if data:
                         df = pd.DataFrame(data)
-                        st.success(f"Successfully extracted {len(data)} commercial records!")
+                        st.success(f"Successfully extracted {len(data)} records!")
                         st.dataframe(df, use_container_width=True)
                         
                         csv_data = df.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label="📥 Download Client Excel/CSV Report",
+                            label="📥 Download CSV Report",
                             data=csv_data,
-                            file_name="client_market_data.csv",
+                            file_name="universal_scraped_data.csv",
                             mime="text/csv"
                         )
                     else:
-                        st.warning("No structured items found. Try a different category URL.")
+                        st.warning("This page structure is heavily restricted or protected.")
                 else:
                     st.error(f"Failed to connect. Status code: {response.status_code}")
             except Exception as e:
